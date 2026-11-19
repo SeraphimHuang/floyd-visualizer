@@ -206,10 +206,13 @@ export function findNegativeCycles(state: MatrixState, edgeWeight: (u: number, v
       weight += w;
     }
     if (!valid || !(weight < -NEGATIVE_EPS)) continue;
-    // Canonical rotation: start at the smallest node index.
-    const start = loop.indexOf(Math.min(...loop));
-    const rotated = [...loop.slice(start), ...loop.slice(0, start)];
-    found.set(rotated.join(','), { nodes: [...rotated, rotated[0]], weight });
+    // De-duplicate by a canonical rotation (smallest index first), but display the loop starting
+    // at the node whose diagonal revealed it, so it matches "dist[i][i] < 0" in the narration.
+    const rot = (start: number) => [...loop.slice(start), ...loop.slice(0, start)];
+    const key = rot(loop.indexOf(Math.min(...loop))).join(',');
+    if (found.has(key)) continue;
+    const shown = loop.includes(i) ? rot(loop.indexOf(i)) : loop;
+    found.set(key, { nodes: [...shown, shown[0]], weight });
   }
   return [...found.values()].sort((a, b) => a.weight - b.weight);
 }
