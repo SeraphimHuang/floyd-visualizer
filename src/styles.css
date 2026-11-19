@@ -255,9 +255,11 @@ input[type='range'] { accent-color: var(--primary-strong); }
 @keyframes flow { to { stroke-dashoffset: -22; } }
 
 .edge-label rect { fill: var(--edge-label-bg); stroke: var(--border); }
-.edge-label text { fill: var(--text); text-anchor: middle; font-family: var(--mono); font-weight: 500; }
+.edge-label text { fill: var(--text); text-anchor: middle; font-family: var(--mono); font-weight: 700; }
 .edge-label.clickable { cursor: pointer; }
-.map-view .edge-label rect { fill: color-mix(in srgb, var(--edge-label-bg) 88%, transparent); }
+.label-leader { stroke: color-mix(in srgb, var(--edge) 50%, var(--text)); stroke-width: 1.2; stroke-dasharray: 2 2; }
+.map-view .edge-label rect { fill: var(--edge-label-bg); stroke: color-mix(in srgb, var(--edge) 60%, var(--text)); stroke-width: 1.2; }
+.edge-label rect { filter: drop-shadow(0 1px 1.5px rgba(80, 60, 0, 0.18)); }
 
 /* Nodes */
 .node { cursor: pointer; }

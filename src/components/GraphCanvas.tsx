@@ -62,7 +62,8 @@ function edgeGeometry(a: Pt, b: Pt, curved: boolean, r: number) {
   const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy) || 1;
   // Bend to the right of the travel direction, so a→b and b→a curve apart.
-  const bend = curved ? Math.min(len * 0.16, r * 2.4) : 0;
+  // Short edges (close cities on a map) still get a clear gap between the two directions.
+  const bend = curved ? Math.min(Math.max(len * 0.16, r * 1.1), r * 2.4, len * 0.45) : 0;
   const c = { x: (a.x + b.x) / 2 + (dy / len) * bend * -1, y: (a.y + b.y) / 2 + (dx / len) * bend };
   const u1 = unit(c.x - a.x, c.y - a.y);
   const u2 = unit(b.x - c.x, b.y - c.y);
@@ -96,6 +97,67 @@ function labelPlacement(p: Pt, neighbors: Pt[], center: Pt, r: number, fontSize:
   return { y: gap + fontSize * 0.75, textAnchor: 'middle' } as const;
 }
 
+interface LabelBox {
+  x: number;
+  y: number;
+  /** Where the label wanted to be (the middle of its edge). */
+  x0: number;
+  y0: number;
+  w: number;
+  h: number;
+  /** Unit normal of the edge, used to push apart labels that sit exactly on top of each other. */
+  nx: number;
+  ny: number;
+}
+
+/**
+ * Nudges weight labels so they don't overlap each other or cover a node.
+ * A few rounds of pairwise pushing is plenty for graphs of this size, and it's deterministic.
+ */
+function separateLabels(labels: LabelBox[], nodes: Pt[], r: number): LabelBox[] {
+  const out = labels.map((l) => ({ ...l }));
+  const pad = 3;
+  for (let iter = 0; iter < 60; iter++) {
+    let moved = false;
+    for (let a = 0; a < out.length; a++) {
+      for (let b = a + 1; b < out.length; b++) {
+        const A = out[a], B = out[b];
+        const dx = B.x - A.x, dy = B.y - A.y;
+        const ox = (A.w + B.w) / 2 + pad - Math.abs(dx);
+        const oy = (A.h + B.h) / 2 + pad - Math.abs(dy);
+        if (ox <= 0 || oy <= 0) continue;
+        moved = true;
+        // Push along the axis with less overlap; if centered on each other, use the edge normal.
+        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+          A.x -= A.nx * 2; A.y -= A.ny * 2; B.x += A.nx * 2; B.y += A.ny * 2;
+        } else if (ox < oy) {
+          const m = (ox / 2 + 0.5) * Math.sign(dx || 1);
+          A.x -= m; B.x += m;
+        } else {
+          const m = (oy / 2 + 0.5) * Math.sign(dy || 1);
+          A.y -= m; B.y += m;
+        }
+      }
+      // Keep labels off the node circles.
+      const L = out[a];
+      for (const n of nodes) {
+        const cx = Math.max(L.x - L.w / 2, Math.min(n.x, L.x + L.w / 2));
+        const cy = Math.max(L.y - L.h / 2, Math.min(n.y, L.y + L.h / 2));
+        const d = Math.hypot(n.x - cx, n.y - cy);
+        const need = r + pad - d;
+        if (need > 0) {
+          const u = unit(L.x - n.x || L.nx, L.y - n.y || L.ny);
+          L.x += u.x * (need + 0.5);
+          L.y += u.y * (need + 0.5);
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return out;
+}
+
 const MARKERS = ['base', 'ik', 'kj', 'query', 'baseline', 'ghost', 'changed'] as const;
 type Marker = (typeof MARKERS)[number];
 
@@ -121,6 +183,27 @@ export function GraphCanvas(props: Props) {
     x: pos.reduce((s, q) => s + q.x, 0) / pos.length,
     y: pos.reduce((s, q) => s + q.y, 0) / pos.length,
   };
+  // Weight labels start at the middle of their edge, then get pushed apart if they collide.
+  const labelTexts = graph.edges.map((e) => formatWeight(e.weight));
+  const labelBoxes = separateLabels(
+    graph.edges.map((e, idx) => {
+      const { mid } = geom(e.from, e.to);
+      const a = pos[e.from], b = pos[e.to];
+      const n = unit(-(b.y - a.y), b.x - a.x);
+      return {
+        x: mid.x,
+        y: mid.y,
+        x0: mid.x,
+        y0: mid.y,
+        w: labelTexts[idx].length * fontSize * 0.62 + fontSize * 0.7,
+        h: fontSize * 1.35,
+        nx: n.x,
+        ny: n.y,
+      };
+    }),
+    pos,
+    r,
+  );
   const neighbors = graph.nodes.map((): number[] => []);
   for (const e of graph.edges) {
     neighbors[e.from].push(e.to);
@@ -196,17 +279,23 @@ export function GraphCanvas(props: Props) {
           />
         ))}
 
+      {/* Thin leader lines for labels that had to move away from their edge */}
+      {labelBoxes.map((b, idx) =>
+        Math.hypot(b.x - b.x0, b.y - b.y0) > b.h * 0.9 ? (
+          <line key={`leader-${idx}`} className="label-leader" x1={b.x0} y1={b.y0} x2={b.x} y2={b.y} />
+        ) : null,
+      )}
+
       {/* Weight labels */}
-      {graph.edges.map((e) => {
-        const { mid } = geom(e.from, e.to);
-        const text = formatWeight(e.weight);
-        const w = text.length * fontSize * 0.62 + fontSize * 0.6;
-        const h = fontSize * 1.3;
+      {graph.edges.map((e, idx) => {
+        const box = labelBoxes[idx];
+        const text = labelTexts[idx];
+        const { w, h } = box;
         return (
           <g
             key={`label-${edgeKey(e.from, e.to)}`}
             className={`edge-label${props.editMode ? ' clickable' : ''}`}
-            transform={`translate(${mid.x},${mid.y})`}
+            transform={`translate(${box.x},${box.y})`}
             onClick={props.editMode ? () => props.onEdgeClick(e.from, e.to) : undefined}
           >
             <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h / 2} />

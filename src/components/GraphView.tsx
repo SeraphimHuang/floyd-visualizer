@@ -38,11 +38,13 @@ function fit(points: Pt[]): Pt[] {
 export function GraphView(props: CanvasProps) {
   const pos = useMemo(() => fit(rawPositions(props.graph.nodes)), [props.graph.nodes]);
   const n = props.graph.nodes.length;
-  const r = n <= 5 ? 34 : n <= 8 ? 28 : 22;
+  // Big enough to read from the back of a room when projected.
+  const r = n <= 5 ? 40 : n <= 8 ? 32 : 24;
+  const fontSize = n <= 5 ? 30 : n <= 8 ? 22 : 18;
   const showLabels = props.graph.nodes.some((nd) => nd.label && nd.label !== nd.id);
   return (
     <div className="graph-view">
-      <GraphCanvas {...props} pos={pos} r={r} fontSize={n <= 5 ? 22 : 18} viewBox={`0 0 ${W} ${H}`} showLabels={showLabels} />
+      <GraphCanvas {...props} pos={pos} r={r} fontSize={fontSize} viewBox={`0 0 ${W} ${H}`} showLabels={showLabels} />
     </div>
   );
 }

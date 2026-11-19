@@ -57,12 +57,16 @@ export function MapView(props: CanvasProps) {
     });
   }
 
+  // Scale nodes and text with the map's size, so they read well on a projector.
+  const r = Math.round(Math.max(14, Math.min(28, Math.min(size.x, size.y) / 26)));
+  const fontSize = Math.round(r * 0.78);
+
   return (
     <div className="map-view">
       <div ref={el} className="map" />
       {m && size.x > 0 && (
         <div className="map-overlay">
-          <GraphCanvas {...props} pos={pos} r={17} fontSize={13} viewBox={`0 0 ${size.x} ${size.y}`} showLabels={false} />
+          <GraphCanvas {...props} pos={pos} r={r} fontSize={fontSize} viewBox={`0 0 ${size.x} ${size.y}`} showLabels={false} />
         </div>
       )}
     </div>
