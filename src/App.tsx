@@ -52,7 +52,7 @@ export default function App() {
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState<Draft>({ from: '', to: '', weight: '' });
   const [view, setView] = useState<View>(urlParams.get('view') === 'map' ? 'map' : 'graph');
-  const [theme, setTheme] = useState<Theme>(() => readStored('theme', ['dark', 'light'], 'dark'));
+  const [theme, setTheme] = useState<Theme>(() => readStored('fw-theme', ['dark', 'light'], 'light'));
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -154,11 +154,12 @@ export default function App() {
     return e ? e.weight : null;
   }, [editedGraph, draft.from, draft.to]);
 
+  const withoutDraftEdge = () => ops.filter((o) => !(o.from === draft.from && o.to === draft.to));
   const setEdge = () => {
-    applyOps([...ops, { type: 'set', from: draft.from, to: draft.to, weight: Number(draft.weight) }], null);
+    applyOps([...withoutDraftEdge(), { type: 'set', from: draft.from, to: draft.to, weight: Number(draft.weight) }], null);
   };
   const removeEdge = () => {
-    applyOps([...ops, { type: 'remove', from: draft.from, to: draft.to }], null);
+    applyOps([...withoutDraftEdge(), { type: 'remove', from: draft.from, to: draft.to }], null);
     setDraft({ from: '', to: '', weight: '' });
   };
 
@@ -170,7 +171,7 @@ export default function App() {
     a.href = URL.createObjectURL(blob);
     a.download = `${dataset!.fileName.replace(/\.json$/, '')}-edited.json`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
   // ---------- Local files (button or drag & drop) ----------
@@ -218,7 +219,7 @@ export default function App() {
   // ---------- Theme ----------
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    try { localStorage.setItem('theme', theme); } catch { /* storage unavailable */ }
+    try { localStorage.setItem('fw-theme', theme); } catch { /* storage unavailable */ }
   }, [theme]);
 
   // ---------- Keyboard ----------
@@ -227,6 +228,8 @@ export default function App() {
       const t = e.target as HTMLElement;
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(t.tagName) && t.getAttribute('type') !== 'range') return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // A focused button would also be "clicked" by Space/Enter on key-up; drop focus first.
+      if (t.tagName === 'BUTTON') t.blur();
       switch (e.key) {
         case 'ArrowRight': e.preventDefault(); setPlaying(false); next(); break;
         case 'ArrowLeft': e.preventDefault(); setPlaying(false); prev(); break;
@@ -338,13 +341,19 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden>
-            <svg viewBox="0 0 32 32"><circle cx="8" cy="9" r="5" /><circle cx="24" cy="23" r="5" /><path d="M12 12 L20 20" /></svg>
+            <svg viewBox="0 0 32 32">
+              <ellipse cx="16" cy="22" rx="12" ry="7.5" fill="#ffd23f" stroke="#e8ae00" strokeWidth="1.5" />
+              <circle cx="12" cy="12" r="6.5" fill="#ffd23f" stroke="#e8ae00" strokeWidth="1.5" />
+              <path d="M5.5 12.5 Q1.5 13 2.5 15 Q5 15.5 7 14" fill="#ff8a00" />
+              <circle cx="11" cy="10.5" r="1.3" fill="#3d3320" />
+              <path d="M19 20 Q23 18 25 21" stroke="#e8ae00" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+            </svg>
           </span>
           <h1>Floyd-Warshall <span>Visualizer</span></h1>
         </div>
 
         <div className="topbar-controls">
-          <select className="dataset-select" value={dsId} onChange={(e) => selectDataset(e.target.value)} aria-label="Dataset">
+          <select className="dataset-select" value={dsId} onChange={(e) => { selectDataset(e.target.value); e.target.blur(); }} aria-label="Dataset">
             <optgroup label="From the repo (data/)">
               {repoSets.map((d) => <option key={d.id} value={d.id}>{dsLabel(d)}</option>)}
             </optgroup>
@@ -431,7 +440,7 @@ export default function App() {
                   {showOriginal ? 'Original graph' : activeScenario ?? 'Modified graph'}
                 </div>
               )}
-              {effectiveView === 'map' ? <MapView {...canvasProps} theme={theme} /> : <GraphView {...canvasProps} />}
+              {effectiveView === 'map' ? <MapView {...canvasProps} /> : <GraphView {...canvasProps} />}
             </div>
 
             {narration && (
@@ -444,6 +453,7 @@ export default function App() {
             <Controls
               graph={graph}
               trace={trace}
+              stops={stops}
               p={pos}
               playing={playing}
               speed={speed}

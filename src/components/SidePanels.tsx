@@ -29,25 +29,35 @@ export function PathPanel(props: {
       ) : (
         <>
           <div className="path-line">
-            {path ? path.map(id).join(' → ') : `No path from ${id(src)} to ${id(tgt)} yet`}
+            {path ? path.map(id).join(' → ') : `No path from ${id(src)} to ${id(tgt)}${props.isFinal ? '' : ' yet'}`}
           </div>
-          {props.dist !== null && props.dist !== Infinity && (
-            <div className="path-dist">
-              {formatWeight(props.dist, u)}
-              {props.baselineDist !== null && props.baselineDist !== props.dist && (
-                <span className={props.dist > props.baselineDist ? 'worse' : 'better'}>
-                  {' '}(was {formatWeight(props.baselineDist, u)},{' '}
-                  {props.dist > props.baselineDist ? '+' : '−'}
-                  {formatWeight(Math.abs(props.dist - props.baselineDist), u)})
-                </span>
-              )}
-            </div>
-          )}
+          <PathDistance dist={props.dist} baseline={props.baselineDist} units={u} />
           {!props.isFinal && (
             <p className="muted small">Best path found so far. It may still improve in later rounds.</p>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function PathDistance({ dist, baseline, units }: { dist: number | null; baseline: number | null; units: string }) {
+  if (dist === null) return null;
+  const fmt = (x: number) => formatWeight(x, units);
+  let change: React.ReactNode = null;
+  if (baseline !== null && baseline !== dist) {
+    const worse = dist > baseline;
+    const text =
+      dist === Infinity ? `was ${fmt(baseline)}, now unreachable`
+      : baseline === Infinity ? 'was unreachable'
+      : `was ${fmt(baseline)}, ${worse ? '+' : '−'}${fmt(Math.abs(dist - baseline))}`;
+    change = <span className={worse ? 'worse' : 'better'}> ({text})</span>;
+  }
+  if (dist === Infinity && !change) return null;
+  return (
+    <div className="path-dist">
+      {dist !== Infinity && fmt(dist)}
+      {change}
     </div>
   );
 }

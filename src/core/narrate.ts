@@ -67,16 +67,17 @@ export function narrate(graph: Graph, trace: Trace, p: number, roundsMode: boole
     const missing = s.ik === Infinity ? `${I} → ${K}` : `${K} → ${J}`;
     return {
       title: head,
-      detail: `There is no known path ${missing} yet (∞), so we can't go through ${K}. Keep ${w(s.before)}.`,
+      detail: `No path ${missing} is known yet (∞), so we can't go through ${K}. Keep ${w(s.before)}.`,
       tone: 'skip',
     };
   }
 
-  const sum = `${I}→${K}→${J} = ${w(s.ik)} + ${w(s.kj)} = ${w(s.candidate)}`;
+  // Use dist[][] (not "A→B→D") because dist[i][k] may already be a multi-edge path.
+  const sum = `dist[${I}][${K}] + dist[${K}][${J}] = ${w(s.ik)} + ${w(s.kj)} = ${w(s.candidate)}`;
   if (s.updated) {
     return {
       title: head,
-      detail: `Through ${K}: ${sum} < ${w(s.before)}. Shorter! Update dist[${I}][${J}] = ${w(s.candidate)}.`,
+      detail: `Through ${K}: ${sum} < ${w(s.before)}. Shorter! dist[${I}][${J}] becomes ${w(s.candidate)}.`,
       tone: 'update',
     };
   }

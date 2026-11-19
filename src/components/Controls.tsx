@@ -4,6 +4,8 @@ import type { Graph } from '../core/types';
 interface Props {
   graph: Graph;
   trace: Trace;
+  /** Positions the player stops at (depends on the granularity). */
+  stops: number[];
   p: number;
   playing: boolean;
   speed: number;
@@ -22,6 +24,11 @@ export function Controls(props: Props) {
   const N = trace.steps.length;
   const step = p > 0 ? trace.steps[p - 1] : null;
   const name = (i: number) => graph.nodes[i].id;
+  // First stop inside round k (not the position just before it, which still belongs to round k-1).
+  const jumpToRound = (k: number) => {
+    const lo = roundStart(trace, k), hi = lo + trace.n * trace.n;
+    props.onSeek(props.stops.find((x) => x > lo && x <= hi) ?? lo + 1);
+  };
 
   return (
     <div className="controls">
@@ -59,7 +66,7 @@ export function Controls(props: Props) {
       <div className="controls-row">
         <label className="field">
           <span>Stop at</span>
-          <select value={props.granularity} onChange={(e) => props.onGranularity(e.target.value as Granularity)}>
+          <select value={props.granularity} onChange={(e) => { props.onGranularity(e.target.value as Granularity); e.target.blur(); }}>
             {(Object.keys(GRANULARITY_LABELS) as Granularity[]).map((g) => (
               <option key={g} value={g}>{GRANULARITY_LABELS[g]}</option>
             ))}
@@ -86,8 +93,8 @@ export function Controls(props: Props) {
               <button
                 key={nd.id}
                 className={props.currentK === k ? 'active' : ''}
-                onClick={() => props.onSeek(roundStart(trace, k))}
-                title={`Jump to the start of round k = ${nd.id}`}
+                onClick={() => jumpToRound(k)}
+                title={`Jump to round k = ${nd.id}`}
               >
                 {nd.id}
               </button>

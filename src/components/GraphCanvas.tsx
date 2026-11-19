@@ -231,6 +231,7 @@ export function GraphCanvas(props: Props) {
         const idSize = n.id.length > 2 ? fontSize * 0.85 : fontSize * 1.1;
         return (
           <g key={n.id} className={cls} transform={`translate(${p.x},${p.y})`} onClick={() => props.onNodeClick(i)}>
+            <title>{n.label && n.label !== n.id ? `${n.label} (${n.id})` : n.id}</title>
             <circle r={r} />
             <text className="node-id" dy="0.35em" style={{ fontSize: idSize }}>{n.id}</text>
             {hl.k === i && (
