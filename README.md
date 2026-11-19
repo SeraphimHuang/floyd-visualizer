@@ -14,6 +14,17 @@ CS5800 final project.
 Any dataset in `data/` opens directly with `?data=<file name without .json>`. New datasets appear on
 the site a few minutes after their pull request is merged.
 
+## ➕ Add your own dataset (no git needed)
+
+1. Copy [`data/_template.json`](data/_template.json), rename it (e.g. `my-graph.json`), and edit the nodes and edges.
+2. **Preview it**: open the live site and drag your file onto the page. Mistakes are listed clearly.
+3. On GitHub, open the [`data/`](data/) folder → **Add file → Upload files** → drop your file →
+   **Create a new branch and start a pull request**.
+4. An automatic check validates the file. Once the pull request is merged, it's on the site.
+
+Full file format (positions, map coordinates, morning/evening weights, exchange rates, scenarios):
+[`data/README.md`](data/README.md).
+
 - **Step through the algorithm**: every comparison `dist[i][k] + dist[k][j] < dist[i][j]?`
   is shown on the graph, in the matrix, and in a one-line explanation.
 - **Any graph**: drop a JSON file in [`data/`](data/README.md) and it appears in the menu.
