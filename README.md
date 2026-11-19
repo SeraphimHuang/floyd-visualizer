@@ -3,6 +3,17 @@
 Interactive, step-by-step visualization of the Floyd-Warshall all-pairs shortest path algorithm.
 CS5800 final project.
 
+## 👉 Live site: https://seraphimhuang.github.io/floyd-visualizer/
+
+| Demo | Link |
+| --- | --- |
+| 4-node step-by-step example | [?data=toy4](https://seraphimhuang.github.io/floyd-visualizer/?data=toy4) |
+| Bay Area commute on a map | [?data=bayarea7&view=map](https://seraphimhuang.github.io/floyd-visualizer/?data=bayarea7&view=map) |
+| Cute coin arbitrage (negative cycles) | [?data=cute-coins](https://seraphimhuang.github.io/floyd-visualizer/?data=cute-coins) |
+
+Any dataset in `data/` opens directly with `?data=<file name without .json>`. New datasets appear on
+the site a few minutes after their pull request is merged.
+
 - **Step through the algorithm**: every comparison `dist[i][k] + dist[k][j] < dist[i][j]?`
   is shown on the graph, in the matrix, and in a one-line explanation.
 - **Any graph**: drop a JSON file in [`data/`](data/README.md) and it appears in the menu.
