@@ -17,6 +17,11 @@ export function validateGraphFile(raw: unknown): string[] {
   if (f.directed !== undefined && typeof f.directed !== 'boolean')
     errors.push('"directed" must be true or false.');
   if (f.units !== undefined && typeof f.units !== 'string') errors.push('"units" must be a string.');
+  if (f.mode !== undefined && f.mode !== 'distance' && f.mode !== 'exchange')
+    errors.push('"mode" must be "distance" or "exchange".');
+  const exchange = f.mode === 'exchange';
+  if (exchange && f.weightProfiles !== undefined)
+    errors.push('"weightProfiles" are not supported in exchange mode.');
 
   // Weight profiles
   const profileIds: string[] = [];
@@ -52,6 +57,16 @@ export function validateGraphFile(raw: unknown): string[] {
         errors.push(`Node "${n.id}": "lat" and "lng" must both be numbers.`);
     });
   }
+
+  /** Exchange mode: every edge needs a positive "rate". Distance mode: a non-negative "weight". */
+  const checkValue = (e: Record<string, unknown>, where: string) => {
+    if (!exchange) {
+      if (e.rate !== undefined) errors.push(`${where}: "rate" is only for "mode": "exchange" files; use "weight".`);
+      return checkWeight(e.weight, where);
+    }
+    if (e.weight !== undefined) errors.push(`${where}: exchange-mode edges use "rate", not "weight".`);
+    if (!isNum(e.rate) || e.rate <= 0) errors.push(`${where}: "rate" must be a number greater than 0.`);
+  };
 
   const checkWeight = (w: unknown, where: string) => {
     if (isNum(w)) {
@@ -92,7 +107,7 @@ export function validateGraphFile(raw: unknown): string[] {
       if (!isObj(e)) return errors.push(`edges[${i}] must be an object.`);
       const where = `Edge ${String(e.from)} → ${String(e.to)}`;
       checkEnds(e.from, e.to, where);
-      checkWeight(e.weight, where);
+      checkValue(e, where);
       const k = `${e.from}->${e.to}`;
       if (seen.has(k)) errors.push(`${where} appears more than once.`);
       seen.add(k);
@@ -125,7 +140,7 @@ export function validateGraphFile(raw: unknown): string[] {
               if (!isObj(e)) return errors.push(`${where}: addEdges entries must be objects.`);
               const w = `${where}, add ${String(e.from)} → ${String(e.to)}`;
               checkEnds(e.from, e.to, w);
-              checkWeight(e.weight, w);
+              checkValue(e, w);
             });
         }
       });

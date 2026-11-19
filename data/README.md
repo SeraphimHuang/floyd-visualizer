@@ -60,6 +60,23 @@ switch for them. See `bayarea7.json`.
 ]
 ```
 
+### Exchange rates (arbitrage)
+
+Set `"mode": "exchange"` and give each edge a `rate` (how many units of `to` one unit of `from`
+buys) instead of a `weight`. See `cute-coins.json`.
+
+```json
+"mode": "exchange",
+"edges": [
+  { "from": "🐱", "to": "🐶", "rate": 1.19 }
+]
+```
+
+The algorithm runs on weights `−ln(rate)`: adding weights multiplies rates, so the "shortest"
+route is the best rate, and a loop with negative total weight (a rate above 1 from a coin back
+to itself) is an **arbitrage** loop. The page shows rates by default and can switch to the
+`−ln` weights. Rates must be greater than 0; `weightProfiles` are not supported in this mode.
+
 ## Submitting
 
 You don't need git:

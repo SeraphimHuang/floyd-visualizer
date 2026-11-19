@@ -21,11 +21,13 @@ export interface Highlight {
   queryTgt: number | null;
   /** The same query on the original (unedited) graph, for comparison. */
   baseline: number[] | null;
+  /** An arbitrage loop (negative cycle), first node repeated at the end. */
+  cycle: number[] | null;
 }
 
 export const NO_HIGHLIGHT: Highlight = {
   k: null, i: null, j: null, pathIK: null, pathKJ: null,
-  query: null, querySrc: null, queryTgt: null, baseline: null,
+  query: null, querySrc: null, queryTgt: null, baseline: null, cycle: null,
 };
 
 export const edgeKey = (from: number, to: number) => `${from}-${to}`;
@@ -36,6 +38,8 @@ interface Props {
   /** Node radius in drawing units. */
   r: number;
   fontSize: number;
+  /** Text for an edge weight (exchange graphs show rates). */
+  formatEdge?: (w: number) => string;
   /** Show the long label (e.g. city name) under the node. */
   showLabels: boolean;
   viewBox?: string;
@@ -158,7 +162,7 @@ function separateLabels(labels: LabelBox[], nodes: Pt[], r: number): LabelBox[] 
   return out;
 }
 
-const MARKERS = ['base', 'ik', 'kj', 'query', 'baseline', 'ghost', 'changed'] as const;
+const MARKERS = ['base', 'ik', 'kj', 'query', 'baseline', 'ghost', 'changed', 'cycle'] as const;
 type Marker = (typeof MARKERS)[number];
 
 export function GraphCanvas(props: Props) {
@@ -184,7 +188,7 @@ export function GraphCanvas(props: Props) {
     y: pos.reduce((s, q) => s + q.y, 0) / pos.length,
   };
   // Weight labels start at the middle of their edge, then get pushed apart if they collide.
-  const labelTexts = graph.edges.map((e) => formatWeight(e.weight));
+  const labelTexts = graph.edges.map((e) => (props.formatEdge ?? formatWeight)(e.weight));
   const labelBoxes = separateLabels(
     graph.edges.map((e, idx) => {
       const { mid } = geom(e.from, e.to);
@@ -267,6 +271,7 @@ export function GraphCanvas(props: Props) {
       {pathSegments(hl.pathIK, 'path-ik', 'ik')}
       {pathSegments(hl.pathKJ, 'path-kj', 'kj')}
       {pathSegments(hl.query, 'path-query', 'query')}
+      {pathSegments(hl.cycle, 'path-cycle', 'cycle')}
 
       {/* Click targets for edges (edit mode) */}
       {props.editMode &&
@@ -324,7 +329,11 @@ export function GraphCanvas(props: Props) {
             <circle r={r} />
             <text className="node-id" dy="0.35em" style={{ fontSize: idSize }}>{n.id}</text>
             {hl.k === i && (
-              <text className="node-tag" y={-r - fontSize * 0.5} style={{ fontSize: fontSize * 0.85 }}>k</text>
+              // Small "k" badge on the node's upper-right, clear of the node's own label.
+              <g transform={`translate(${r * 0.78},${-r * 0.78})`}>
+                <circle className="node-tag-bg" r={fontSize * 0.55} />
+                <text className="node-tag on-badge" dy="0.35em" style={{ fontSize: fontSize * 0.7 }}>k</text>
+              </g>
             )}
             {props.showLabels && n.label && n.label !== n.id && (
               <text className="node-label" {...labelPlacement(p, neighbors[i].map((v) => pos[v]), center, r, fontSize)} style={{ fontSize: fontSize * 0.9 }}>

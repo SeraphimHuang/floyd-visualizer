@@ -17,8 +17,18 @@ export type WeightSpec = number | Record<string, number>;
 export interface FileEdge {
   from: string;
   to: string;
-  weight: WeightSpec;
+  /** Distance mode: the edge weight. */
+  weight?: WeightSpec;
+  /** Exchange mode: how many units of `to` one unit of `from` buys. */
+  rate?: number;
 }
+
+/**
+ * "distance" (default): weights are added, smaller is better.
+ * "exchange": edges carry exchange rates. The algorithm runs on −ln(rate), so adding weights
+ * multiplies rates, "shortest" means "best rate", and a negative cycle is an arbitrage loop.
+ */
+export type GraphMode = 'distance' | 'exchange';
 
 export interface WeightProfile {
   id: string;
@@ -37,6 +47,7 @@ export interface Scenario {
 export interface GraphFile {
   name: string;
   description?: string;
+  mode?: GraphMode;
   /** Defaults to true. If false, every edge is used in both directions. */
   directed?: boolean;
   /** Unit shown after weights, e.g. "min". */
@@ -52,6 +63,7 @@ export interface GraphFile {
 /** An edit applied on top of the file's edges (by node id). */
 export type EditOp =
   | { type: 'remove'; from: string; to: string }
+  /** In exchange mode `weight` is the exchange rate. */
   | { type: 'set'; from: string; to: string; weight: WeightSpec };
 
 /** Edge between node indices with a resolved numeric weight. */
@@ -63,6 +75,8 @@ export interface Edge {
 
 export interface Graph {
   nodes: GraphNode[];
+  /** In exchange mode, weight = −ln(rate). */
   edges: Edge[];
   units: string;
+  mode: GraphMode;
 }

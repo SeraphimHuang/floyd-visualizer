@@ -1,5 +1,5 @@
 import type { Step } from '../core/floyd';
-import { formatWeight } from '../core/graph';
+import { NEGATIVE_EPS } from '../core/floyd';
 import type { Graph } from '../core/types';
 
 interface Props {
@@ -13,10 +13,15 @@ interface Props {
   /** Final distances of the original graph: when set, cells show old → new. */
   diffAgainst: number[][] | null;
   query: [number, number] | null;
+  /** Formats a dist value (exchange graphs can show rates). */
+  fmt: (w: number) => string;
+  /** Label for the card, e.g. "dist matrix" or "best rate matrix". */
+  title: string;
   onCellClick: (i: number, j: number) => void;
 }
 
-export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, onCellClick }: Props) {
+export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, fmt, title, onCellClick }: Props) {
+  const formatWeight = fmt;
   const ids = graph.nodes.map((n) => n.id);
   const changedCount = diffAgainst
     ? dist.reduce((s, row, i) => s + row.filter((v, j) => v !== diffAgainst[i][j]).length, 0)
@@ -25,7 +30,7 @@ export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, onCel
   return (
     <div className="card matrix-card">
       <div className="card-title">
-        <span>dist matrix</span>
+        <span>{title}</span>
         {diffAgainst && (
           <span className="badge badge-diff">
             {changedCount} cell{changedCount === 1 ? '' : 's'} changed vs original
@@ -33,7 +38,7 @@ export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, onCel
         )}
       </div>
       <div className="matrix-scroll">
-        <table className={`matrix${ids.length > 6 ? ' compact' : ''}`}>
+        <table className={`matrix${ids.length > 6 || graph.mode === 'exchange' ? ' compact' : ''}`}>
           <thead>
             <tr>
               <th className="corner" title="row = from, column = to">from \ to</th>
@@ -49,7 +54,7 @@ export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, onCel
                 {row.map((v, j) => {
                   const cls = ['cell'];
                   if (k !== null && (i === k || j === k)) cls.push('in-k');
-                  if (i === j) cls.push('diag');
+                  if (i === j) cls.push(v < -NEGATIVE_EPS ? 'arbitrage' : 'diag');
                   let content: React.ReactNode = formatWeight(v);
 
                   if (step && !step.trivial) {

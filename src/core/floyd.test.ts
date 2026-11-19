@@ -68,6 +68,7 @@ describe('runFloyd', () => {
         nodes: Array.from({ length: n }, (_, i) => ({ id: String(i) })),
         edges: edges.map(([from, to, weight]) => ({ from, to, weight })),
         units: '',
+        mode: 'distance' as const,
       };
       const tr = runFloyd(g);
       expect(stateAt(tr, tr.steps.length).dist).toEqual(reference(n, edges));

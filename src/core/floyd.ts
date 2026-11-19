@@ -13,7 +13,10 @@ export interface Step {
   /** ik + kj */
   candidate: number;
   updated: boolean;
-  /** i = k, j = k or i = j: the comparison can never improve anything. */
+  /**
+   * i = k, j = k or i = j, and nothing changed. Without negative cycles these comparisons can
+   * never improve anything; with them (arbitrage) they can, so updated ones are never trivial.
+   */
   trivial: boolean;
 }
 
@@ -73,7 +76,7 @@ export function runFloyd(graph: Graph): Trace {
         }
         steps.push({
           k, i, j, before, ik, kj, candidate, updated,
-          trivial: i === k || j === k || i === j,
+          trivial: (i === k || j === k || i === j) && !updated,
         });
       }
     }
@@ -144,3 +147,57 @@ export const roundStart = (trace: Trace, k: number) => k * trace.n * trace.n;
 /** Is position p the end of a round? */
 export const isRoundEnd = (trace: Trace, p: number) =>
   p > 0 && p % (trace.n * trace.n) === 0;
+
+// ---------- Negative cycles (arbitrage) ----------
+
+/** Below this, a diagonal entry counts as negative (guards against floating-point noise). */
+export const NEGATIVE_EPS = 1e-9;
+
+export interface NegativeCycle {
+  /** Node sequence, starting and ending at the same node, e.g. [0, 1, 2, 0]. */
+  nodes: number[];
+  /** Sum of the edge weights around the cycle (negative). */
+  weight: number;
+}
+
+/**
+ * Negative cycles visible in the current matrices: dist[i][i] < 0 means some loop from i back
+ * to i has negative total weight. Follows `next` from i to recover the loop, checks it against
+ * the real edges, and removes duplicates (the same loop seen from each of its nodes).
+ */
+export function findNegativeCycles(state: MatrixState, edgeWeight: (u: number, v: number) => number | undefined): NegativeCycle[] {
+  const n = state.dist.length;
+  const found = new Map<string, NegativeCycle>();
+  for (let i = 0; i < n; i++) {
+    if (!(state.dist[i][i] < -NEGATIVE_EPS)) continue;
+    // Walk next[·][i] starting from i until a node repeats.
+    const walk = [i];
+    const seenAt = new Map([[i, 0]]);
+    let u = i;
+    let loop: number[] | null = null;
+    for (let s = 0; s <= 2 * n; s++) {
+      u = state.next[u][i];
+      if (u < 0) break;
+      if (seenAt.has(u)) {
+        loop = walk.slice(seenAt.get(u)!);
+        break;
+      }
+      seenAt.set(u, walk.length);
+      walk.push(u);
+    }
+    if (!loop || loop.length < 2) continue;
+    let weight = 0;
+    let valid = true;
+    for (let s = 0; s < loop.length; s++) {
+      const w = edgeWeight(loop[s], loop[(s + 1) % loop.length]);
+      if (w === undefined) { valid = false; break; }
+      weight += w;
+    }
+    if (!valid || !(weight < -NEGATIVE_EPS)) continue;
+    // Canonical rotation: start at the smallest node index.
+    const start = loop.indexOf(Math.min(...loop));
+    const rotated = [...loop.slice(start), ...loop.slice(0, start)];
+    found.set(rotated.join(','), { nodes: [...rotated, rotated[0]], weight });
+  }
+  return [...found.values()].sort((a, b) => a.weight - b.weight);
+}

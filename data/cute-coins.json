@@ -1,0 +1,41 @@
+{
+  "name": "Cute coin exchange (arbitrage)",
+  "description": "Made-up exchange rates between five cute coins. One rate is mispriced, so a loop of trades makes money.",
+  "mode": "exchange",
+  "directed": true,
+  "nodes": [
+    { "id": "🐱", "label": "Cat Coin",   "x": 0,     "y": -1 },
+    { "id": "🐶", "label": "Dog Coin",   "x": 0.95,  "y": -0.31 },
+    { "id": "🦆", "label": "Duck Coin",  "x": 0.59,  "y": 0.81 },
+    { "id": "🐰", "label": "Bunny Coin", "x": -0.59, "y": 0.81 },
+    { "id": "🐼", "label": "Panda Coin", "x": -0.95, "y": -0.31 }
+  ],
+  "edges": [
+    { "from": "🐱", "to": "🐶", "rate": 1.19 },
+    { "from": "🐶", "to": "🐱", "rate": 0.76 },
+    { "from": "🐶", "to": "🦆", "rate": 0.61 },
+    { "from": "🦆", "to": "🐶", "rate": 1.48 },
+    { "from": "🦆", "to": "🐰", "rate": 2.38 },
+    { "from": "🐰", "to": "🦆", "rate": 0.37 },
+    { "from": "🐰", "to": "🐼", "rate": 0.24 },
+    { "from": "🐼", "to": "🐰", "rate": 3.8 },
+    { "from": "🐼", "to": "🐱", "rate": 1.9 },
+    { "from": "🐱", "to": "🐼", "rate": 0.48 },
+    { "from": "🦆", "to": "🐱", "rate": 1.45 }
+  ],
+  "scenarios": [
+    {
+      "name": "Fix the Duck price",
+      "description": "🦆 → 🐱 back to a fair 1.19: the arbitrage disappears.",
+      "addEdges": [{ "from": "🦆", "to": "🐱", "rate": 1.19 }]
+    },
+    {
+      "name": "Panda pump",
+      "description": "The Duck price is fixed, but 🐼 → 🐱 jumps to 2.2: the arbitrage moves to a new loop.",
+      "addEdges": [
+        { "from": "🦆", "to": "🐱", "rate": 1.19 },
+        { "from": "🐼", "to": "🐱", "rate": 2.2 }
+      ]
+    }
+  ]
+}

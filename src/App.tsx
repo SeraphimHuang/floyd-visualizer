@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadRepoDatasets, parseLocalFile, type Dataset } from './core/datasets';
 import {
-  isRoundEnd, reconstructPath, runFloyd, stateAt, stopsFor, type Granularity,
+  findNegativeCycles, isRoundEnd, reconstructPath, runFloyd, stateAt, stopsFor, type Granularity,
 } from './core/floyd';
-import { buildGraph, exportGraph, getProfiles, scenarioOps } from './core/graph';
+import {
+  buildGraph, exportGraph, getProfiles, scenarioOps, valueFormatter, weightToRate, type Display,
+} from './core/graph';
 import { narrate } from './core/narrate';
 import type { EditOp, Graph, Scenario } from './core/types';
 import { Controls } from './components/Controls';
@@ -11,7 +13,7 @@ import { edgeKey, NO_HIGHLIGHT, type Highlight } from './components/GraphCanvas'
 import { GraphView } from './components/GraphView';
 import { MapView } from './components/MapView';
 import { MatrixPanel } from './components/MatrixPanel';
-import { EditPanel, PathPanel, ScenarioPanel, type Draft } from './components/SidePanels';
+import { ArbitragePanel, EditPanel, PathPanel, ScenarioPanel, type Draft } from './components/SidePanels';
 
 const REPO_DATASETS = loadRepoDatasets();
 type View = 'graph' | 'map';
@@ -50,6 +52,11 @@ export default function App() {
   const [speed, setSpeed] = useState(1.5);
   const [query, setQuery] = useState<{ src: number | null; tgt: number | null }>({ src: null, tgt: null });
   const [editMode, setEditMode] = useState(false);
+  /** Exchange graphs: show rates (default) or the −ln weights the algorithm adds up. */
+  const [display, setDisplay] = useState<Display>('rate');
+  /** Which arbitrage loop to highlight, and whether the user pinned it while stepping. */
+  const [cycleIndex, setCycleIndex] = useState(0);
+  const [cyclePinned, setCyclePinned] = useState(false);
   const [draft, setDraft] = useState<Draft>({ from: '', to: '', weight: '' });
   const [view, setView] = useState<View>(urlParams.get('view') === 'map' ? 'map' : 'graph');
   const [theme, setTheme] = useState<Theme>(() => readStored('fw-theme', ['dark', 'light'], 'light'));
@@ -119,6 +126,8 @@ export default function App() {
     setPlaying(false);
     setQuery({ src: null, tgt: null });
     setDraft({ from: '', to: '', weight: '' });
+    setCycleIndex(0);
+    setCyclePinned(false);
     const d = datasets.find((x) => x.id === id);
     if (d?.source === 'repo') {
       const url = new URL(window.location.href);
@@ -151,7 +160,8 @@ export default function App() {
     const e = editedGraph.edges.find(
       (x) => ids[x.from] === draft.from && ids[x.to] === draft.to,
     );
-    return e ? e.weight : null;
+    if (!e) return null;
+    return editedGraph.mode === 'exchange' ? weightToRate(e.weight) : e.weight;
   }, [editedGraph, draft.from, draft.to]);
 
   const withoutDraftEdge = () => ops.filter((o) => !(o.from === draft.from && o.to === draft.to));
@@ -236,7 +246,7 @@ export default function App() {
         case ' ': e.preventDefault(); togglePlay(); break;
         case 'Home': e.preventDefault(); setPlaying(false); seek(0); break;
         case 'End': e.preventDefault(); setPlaying(false); seek(N); break;
-        case 'Escape': setQuery({ src: null, tgt: null }); setDraft({ from: '', to: '', weight: '' }); break;
+        case 'Escape': setQuery({ src: null, tgt: null }); setDraft({ from: '', to: '', weight: '' }); setCyclePinned(false); break;
         case 'Tab':
           if (modified) { e.preventDefault(); setShowOriginal((x) => !x); }
           break;
@@ -251,19 +261,27 @@ export default function App() {
     if (!graph) return;
     const id = graph.nodes[i].id;
     if (editMode) {
-      setDraft((d) =>
-        !d.from || (d.from && d.to) ? { from: id, to: '', weight: '' } : d.from === id ? d : { ...d, to: id },
-      );
+      if (!draft.from || draft.to) setDraft({ from: id, to: '', weight: '' });
+      else if (draft.from !== id) {
+        // Second click: prefill the current value if this edge already exists.
+        const from = graph.nodes.findIndex((n) => n.id === draft.from);
+        setDraft({ from: draft.from, to: id, weight: edgeValueText(from, i) });
+      }
       return;
     }
     setQuery((q) =>
       q.src === null || q.tgt !== null ? { src: i, tgt: null } : q.src === i ? { src: null, tgt: null } : { src: q.src, tgt: i },
     );
   };
+  /** The current value of edge from → to as the edit form shows it (a rate in exchange mode). */
+  const edgeValueText = (from: number, to: number) => {
+    const e = editedGraph?.edges.find((x) => x.from === from && x.to === to);
+    if (!e) return '';
+    return editedGraph!.mode === 'exchange' ? String(Number(weightToRate(e.weight).toPrecision(6))) : String(e.weight);
+  };
   const onEdgeClick = (from: number, to: number) => {
     if (!editedGraph) return;
-    const e = editedGraph.edges.find((x) => x.from === from && x.to === to);
-    setDraft({ from: editedGraph.nodes[from].id, to: editedGraph.nodes[to].id, weight: e ? String(e.weight) : '' });
+    setDraft({ from: editedGraph.nodes[from].id, to: editedGraph.nodes[to].id, weight: edgeValueText(from, to) });
   };
 
   // ---------- Highlights ----------
@@ -274,7 +292,19 @@ export default function App() {
       ? reconstructPath(originalFinal.next, query.src, query.tgt)
       : null;
 
-  const hl: Highlight = { ...NO_HIGHLIGHT, querySrc: query.src, queryTgt: query.tgt, query: queryPath };
+  // Arbitrage loops (negative cycles) visible at the current step.
+  const cycles = useMemo(() => {
+    if (!graph || !state || graph.mode !== 'exchange') return [];
+    const w = new Map(graph.edges.map((e) => [edgeKey(e.from, e.to), e.weight]));
+    return findNegativeCycles(state, (u, v) => w.get(edgeKey(u, v)));
+  }, [graph, state]);
+  const shownCycle =
+    cycles.length && queryPath === null && (isFinal || atRoundSummary || cyclePinned)
+      ? cycles[Math.min(cycleIndex, cycles.length - 1)].nodes
+      : null;
+  const fmt = valueFormatter(graph?.mode ?? 'distance', display);
+
+  const hl: Highlight = { ...NO_HIGHLIGHT, querySrc: query.src, queryTgt: query.tgt, query: queryPath, cycle: shownCycle };
   if (comparing && baselinePath && queryPath?.join() !== baselinePath.join()) hl.baseline = baselinePath;
   if (step && state && !isFinal) {
     hl.k = step.k;
@@ -311,12 +341,13 @@ export default function App() {
     selectedEdge:
       editMode && draft.from && draft.to ? ([draftIndex(draft.from), draftIndex(draft.to)] as [number, number]) : null,
     draftFrom: editMode && draft.from && !draft.to ? draftIndex(draft.from) : null,
+    formatEdge: fmt,
     onNodeClick,
     onEdgeClick,
     onBackgroundClick: () => (editMode ? setDraft({ from: '', to: '', weight: '' }) : setQuery({ src: null, tgt: null })),
   };
 
-  let narration = graph && trace ? narrate(graph, trace, pos, roundsMode) : null;
+  let narration = graph && trace && state ? narrate(graph, trace, pos, roundsMode, display, state.dist) : null;
   if (narration && comparing && state && originalFinal) {
     const changed = state.dist.reduce(
       (sum, row, i) => sum + row.filter((v, j) => v !== originalFinal.dist[i][j]).length, 0,
@@ -324,9 +355,9 @@ export default function App() {
     narration = {
       title: `Result with "${activeScenario ?? 'your edits'}"`,
       detail: changed
-        ? `${changed} shortest distance${changed > 1 ? 's' : ''} changed compared with the original graph (colored in the matrix). ` +
+        ? `${changed} matrix entr${changed > 1 ? 'ies' : 'y'} changed compared with the original graph (colored in the matrix). ` +
           'Press Home to replay the algorithm on this graph, or Tab to flip to the original.'
-        : 'No shortest distance changed: the edit did not matter for any pair.',
+        : 'No matrix entry changed: the edit did not matter for any pair.',
       tone: 'done',
     };
   }
@@ -375,6 +406,17 @@ export default function App() {
                   {pr.label}
                 </button>
               ))}
+            </div>
+          )}
+
+          {graph?.mode === 'exchange' && (
+            <div className="seg" role="group" aria-label="Show values as">
+              <button className={display === 'rate' ? 'active' : ''} onClick={() => setDisplay('rate')} title="Show exchange rates (multiply along a route)">
+                Rates
+              </button>
+              <button className={display === 'weight' ? 'active' : ''} onClick={() => setDisplay('weight')} title="Show the weights −ln(rate) the algorithm adds up">
+                −ln weights
+              </button>
             </div>
           )}
 
@@ -431,6 +473,7 @@ export default function App() {
                 <span><i className="line line-kj" />k ⇝ j</span>
                 <span><i className="line line-query" />selected path</span>
                 {comparing && <span><i className="line line-baseline" />original path</span>}
+                {shownCycle && <span><i className="line line-cycle" />arbitrage loop</span>}
               </div>
             </div>
 
@@ -472,11 +515,13 @@ export default function App() {
             <MatrixPanel
               graph={graph}
               dist={state.dist}
-              step={atRoundSummary || comparing ? null : step}
+              step={atRoundSummary || isFinal ? null : step}
               p={pos}
               k={step && !isFinal ? step.k : null}
               diffAgainst={comparing && originalFinal ? originalFinal.dist : null}
               query={query.src !== null && query.tgt !== null ? [query.src, query.tgt] : null}
+              fmt={fmt}
+              title={graph.mode !== 'exchange' ? 'dist matrix' : display === 'rate' ? 'best rate matrix' : 'dist matrix (−ln rate)'}
               onCellClick={(i, j) => setQuery(i === j ? { src: null, tgt: null } : { src: i, tgt: j })}
             />
             <PathPanel
@@ -491,8 +536,19 @@ export default function App() {
                   : null
               }
               isFinal={isFinal}
+              hasArbitrage={cycles.length > 0}
               onClear={() => setQuery({ src: null, tgt: null })}
             />
+            {graph.mode === 'exchange' && (
+              <ArbitragePanel
+                graph={graph}
+                cycles={cycles}
+                flagged={graph.nodes.map((_, i) => i).filter((i) => state.dist[i][i] < -1e-9)}
+                selected={shownCycle ? Math.min(cycleIndex, cycles.length - 1) : -1}
+                isFinal={isFinal}
+                onSelect={(i) => { setCycleIndex(i); setCyclePinned(true); setQuery({ src: null, tgt: null }); }}
+              />
+            )}
             <ScenarioPanel
               scenarios={file.scenarios ?? []}
               active={activeScenario}

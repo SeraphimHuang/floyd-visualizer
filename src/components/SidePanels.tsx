@@ -1,4 +1,5 @@
-import { describeOp, formatWeight } from '../core/graph';
+import type { NegativeCycle } from '../core/floyd';
+import { describeOp, formatRate, formatWeight, weightToRate } from '../core/graph';
 import type { EditOp, Graph, Scenario } from '../core/types';
 
 // ---------- Shortest path query ----------
@@ -11,19 +12,22 @@ export function PathPanel(props: {
   dist: number | null;
   baselineDist: number | null;
   isFinal: boolean;
+  /** An arbitrage loop exists right now, so "best" values near it are not meaningful. */
+  hasArbitrage: boolean;
   onClear: () => void;
 }) {
   const { graph, src, tgt, path } = props;
+  const exchange = graph.mode === 'exchange';
   const id = (i: number) => graph.nodes[i].id;
   const u = graph.units;
   return (
     <div className="card">
       <div className="card-title">
-        <span>Shortest path</span>
+        <span>{exchange ? 'Best route' : 'Shortest path'}</span>
         {src !== null && <button className="link" onClick={props.onClear}>clear</button>}
       </div>
       {src === null ? (
-        <p className="muted">Click two nodes (or a matrix cell) to see the best path between them.</p>
+        <p className="muted">Click two nodes (or a matrix cell) to see the best {exchange ? 'route' : 'path'} between them.</p>
       ) : tgt === null ? (
         <p className="muted">From <b>{id(src)}</b>. Now click the destination.</p>
       ) : (
@@ -31,9 +35,20 @@ export function PathPanel(props: {
           <div className="path-line">
             {path ? path.map(id).join(' → ') : `No path from ${id(src)} to ${id(tgt)}${props.isFinal ? '' : ' yet'}`}
           </div>
-          <PathDistance dist={props.dist} baseline={props.baselineDist} units={u} />
-          {!props.isFinal && (
-            <p className="muted small">Best path found so far. It may still improve in later rounds.</p>
+          {exchange ? (
+            <ExchangeRate graph={graph} src={src} tgt={tgt} dist={props.dist} baseline={props.baselineDist} />
+          ) : (
+            <PathDistance dist={props.dist} baseline={props.baselineDist} units={u} />
+          )}
+          {props.hasArbitrage ? (
+            <p className="muted small">
+              An arbitrage loop exists, so routes that can pass through it have no true "best" (it keeps growing).
+              This is the value the algorithm recorded.
+            </p>
+          ) : (
+            !props.isFinal && (
+              <p className="muted small">Best found so far. It may still improve in later rounds.</p>
+            )
           )}
         </>
       )}
@@ -58,6 +73,86 @@ function PathDistance({ dist, baseline, units }: { dist: number | null; baseline
     <div className="path-dist">
       {dist !== Infinity && fmt(dist)}
       {change}
+    </div>
+  );
+}
+
+function ExchangeRate(props: { graph: Graph; src: number; tgt: number; dist: number | null; baseline: number | null }) {
+  const { graph, src, tgt, dist, baseline } = props;
+  if (dist === null || dist === Infinity) return null;
+  const rate = weightToRate(dist);
+  const id = (i: number) => graph.nodes[i].id;
+  let change: React.ReactNode = null;
+  if (baseline !== null && baseline !== dist) {
+    const worse = dist > baseline;
+    change = (
+      <span className={worse ? 'worse' : 'better'}>
+        {' '}(was {baseline === Infinity ? 'not possible' : formatRate(weightToRate(baseline))})
+      </span>
+    );
+  }
+  return (
+    <div className="path-dist">
+      1 {id(src)} → {formatRate(rate)} {id(tgt)}
+      {change}
+    </div>
+  );
+}
+
+// ---------- Arbitrage (negative cycles) ----------
+
+export function ArbitragePanel(props: {
+  graph: Graph;
+  cycles: NegativeCycle[];
+  /** Nodes whose dist[i][i] is negative right now. */
+  flagged: number[];
+  selected: number;
+  isFinal: boolean;
+  onSelect: (i: number) => void;
+}) {
+  const { graph, cycles } = props;
+  const id = (i: number) => graph.nodes[i].id;
+  return (
+    <div className={`card arbitrage-card${cycles.length ? ' found' : ''}`}>
+      <div className="card-title">
+        <span>Arbitrage</span>
+        {cycles.length > 0 && <span className="badge badge-arb">{cycles.length} loop{cycles.length > 1 ? 's' : ''}</span>}
+      </div>
+      {cycles.length === 0 ? (
+        <p className="muted">
+          {props.isFinal
+            ? 'No loop of trades makes money: every dist[i][i] stayed at 0.'
+            : 'Watching the diagonal: if some dist[i][i] drops below 0, a loop of trades makes money.'}
+        </p>
+      ) : (
+        <>
+        <p className="small flagged">
+          dist[i][i] &lt; 0 for <b>{props.flagged.map(id).join(' ')}</b>: each can trade around a loop and come back richer.
+        </p>
+        <div className="cycle-list">
+          {cycles.map((c, i) => {
+            const gain = weightToRate(c.weight);
+            const start = id(c.nodes[0]);
+            return (
+              <button
+                key={c.nodes.join(',')}
+                className={`cycle${props.selected === i ? ' active' : ''}`}
+                onClick={() => props.onSelect(i)}
+              >
+                <span className="cycle-path">{c.nodes.map(id).join(' → ')}</span>
+                <span className="cycle-gain">
+                  1 {start} → {formatRate(gain)} {start} <b>(+{((gain - 1) * 100).toFixed(1)}%)</b>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="muted small">
+          Loops are traced back with the <code>next</code> matrix. When several loops exist they feed into each
+          other, so only some of them may be listed.
+        </p>
+        </>
+      )}
     </div>
   );
 }
@@ -136,8 +231,9 @@ export function EditPanel(props: {
   onExport: () => void;
 }) {
   const { graph, draft } = props;
+  const exchange = graph.mode === 'exchange';
   const w = Number(draft.weight);
-  const validWeight = draft.weight.trim() !== '' && Number.isFinite(w) && w >= 0;
+  const validWeight = draft.weight.trim() !== '' && Number.isFinite(w) && (exchange ? w > 0 : w >= 0);
   const validPair = draft.from && draft.to && draft.from !== draft.to;
   return (
     <div className="card">
@@ -153,7 +249,7 @@ export function EditPanel(props: {
         </p>
       ) : (
         <>
-          <p className="muted small">Click two nodes, or click an edge, then set its weight.</p>
+          <p className="muted small">Click two nodes, or click an edge, then set its {exchange ? 'exchange rate' : 'weight'}.</p>
           <div className="edit-form">
             <select value={draft.from} onChange={(e) => props.onDraft({ ...draft, from: e.target.value })}>
               <option value="">from</option>
@@ -167,7 +263,8 @@ export function EditPanel(props: {
             <input
               type="number"
               min={0}
-              placeholder="weight"
+              step="any"
+              placeholder={exchange ? 'rate' : 'weight'}
               value={draft.weight}
               onChange={(e) => props.onDraft({ ...draft, weight: e.target.value })}
               onKeyDown={(e) => e.key === 'Enter' && validPair && validWeight && props.onSet()}

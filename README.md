@@ -8,6 +8,8 @@ CS5800 final project.
 - **Any graph**: drop a JSON file in [`data/`](data/README.md) and it appears in the menu.
 - **What-if scenarios**: remove, add or re-weight edges and compare with the original.
 - **Map view**: graphs with `lat`/`lng` can be shown on a real map (free tiles, no API key).
+- **Arbitrage**: exchange-rate graphs run on `−ln(rate)`; a negative cycle (some `dist[i][i] < 0`)
+  is a loop of trades that makes money, and the page traces and highlights it.
 
 ## Using it
 
