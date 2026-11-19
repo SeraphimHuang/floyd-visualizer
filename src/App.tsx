@@ -521,6 +521,7 @@ export default function App() {
               diffAgainst={comparing && originalFinal ? originalFinal.dist : null}
               query={query.src !== null && query.tgt !== null ? [query.src, query.tgt] : null}
               fmt={fmt}
+              showNegativeWeight={graph.mode === 'exchange' && display === 'rate'}
               title={graph.mode !== 'exchange' ? 'dist matrix' : display === 'rate' ? 'best rate matrix' : 'dist matrix (−ln rate)'}
               onCellClick={(i, j) => setQuery(i === j ? { src: null, tgt: null } : { src: i, tgt: j })}
             />
@@ -543,7 +544,9 @@ export default function App() {
               <ArbitragePanel
                 graph={graph}
                 cycles={cycles}
-                flagged={graph.nodes.map((_, i) => i).filter((i) => state.dist[i][i] < -1e-9)}
+                flagged={graph.nodes
+                  .map((_, i) => ({ node: i, w: state.dist[i][i] }))
+                  .filter((f) => f.w < -1e-9)}
                 selected={shownCycle ? Math.min(cycleIndex, cycles.length - 1) : -1}
                 isFinal={isFinal}
                 onSelect={(i) => { setCycleIndex(i); setCyclePinned(true); setQuery({ src: null, tgt: null }); }}

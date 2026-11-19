@@ -1,5 +1,5 @@
 import type { NegativeCycle } from '../core/floyd';
-import { describeOp, formatRate, formatWeight, weightToRate } from '../core/graph';
+import { describeOp, formatLogWeight, formatRate, formatWeight, weightToRate } from '../core/graph';
 import type { EditOp, Graph, Scenario } from '../core/types';
 
 // ---------- Shortest path query ----------
@@ -104,8 +104,8 @@ function ExchangeRate(props: { graph: Graph; src: number; tgt: number; dist: num
 export function ArbitragePanel(props: {
   graph: Graph;
   cycles: NegativeCycle[];
-  /** Nodes whose dist[i][i] is negative right now. */
-  flagged: number[];
+  /** Nodes whose dist[i][i] is negative right now, with that value. */
+  flagged: { node: number; w: number }[];
   selected: number;
   isFinal: boolean;
   onSelect: (i: number) => void;
@@ -126,9 +126,15 @@ export function ArbitragePanel(props: {
         </p>
       ) : (
         <>
-        <p className="small flagged">
-          dist[i][i] &lt; 0 for <b>{props.flagged.map(id).join(' ')}</b>: each can trade around a loop and come back richer.
-        </p>
+        <p className="small flagged-intro">Negative diagonal = negative cycle = arbitrage:</p>
+        <div className="flagged">
+          {props.flagged.map(({ node, w }) => (
+            <div key={node} className="flag">
+              <span className="mono">dist[{id(node)}][{id(node)}] = <b className="neg">{formatLogWeight(w)}</b> &lt; 0</span>
+              <span className="muted">rate {formatRate(weightToRate(w))} &gt; 1</span>
+            </div>
+          ))}
+        </div>
         <div className="cycle-list">
           {cycles.map((c, i) => {
             const gain = weightToRate(c.weight);

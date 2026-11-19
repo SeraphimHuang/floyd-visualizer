@@ -143,7 +143,8 @@ function narrateStep(s: Step, name: (i: number) => string, A: Arith): Narration 
         title: head,
         detail:
           `Through ${K}: ${sum} ${A.better} ${A.val(s.before)}. ` +
-          `Trading ${I} around a loop ends with MORE ${I} than we started with: arbitrage!`,
+          (A.m === 'rate' ? `In −ln weights: dist[${I}][${I}] = ${formatLogWeight(s.candidate)} < 0, a negative cycle! ` : 'A negative cycle! ') +
+          `Trading ${I} around a loop ends with MORE ${I} than we started with: arbitrage.`,
         tone: 'alert',
       };
     }

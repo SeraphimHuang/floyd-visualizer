@@ -1,5 +1,6 @@
 import type { Step } from '../core/floyd';
 import { NEGATIVE_EPS } from '../core/floyd';
+import { formatLogWeight } from '../core/graph';
 import type { Graph } from '../core/types';
 
 interface Props {
@@ -17,10 +18,12 @@ interface Props {
   fmt: (w: number) => string;
   /** Label for the card, e.g. "dist matrix" or "best rate matrix". */
   title: string;
+  /** Rate view: also print the (negative) −ln weight under arbitrage diagonal cells. */
+  showNegativeWeight?: boolean;
   onCellClick: (i: number, j: number) => void;
 }
 
-export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, fmt, title, onCellClick }: Props) {
+export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, fmt, title, showNegativeWeight, onCellClick }: Props) {
   const formatWeight = fmt;
   const ids = graph.nodes.map((n) => n.id);
   const changedCount = diffAgainst
@@ -78,6 +81,14 @@ export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, fmt, 
                       <>
                         <s className="old">{formatWeight(diffAgainst[i][j])}</s>
                         {formatWeight(v)}
+                      </>
+                    );
+                  }
+                  if (showNegativeWeight && i === j && v < -NEGATIVE_EPS) {
+                    content = (
+                      <>
+                        {content}
+                        <span className="neg-w">{formatLogWeight(v)}</span>
                       </>
                     );
                   }

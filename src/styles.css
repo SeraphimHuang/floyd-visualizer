@@ -377,8 +377,12 @@ input[type='range'] { accent-color: var(--primary-strong); }
 .scenario.active { border-color: var(--k); background: color-mix(in srgb, var(--k) 12%, var(--card-2)); }
 .badge-arb { background: color-mix(in srgb, var(--gold) 30%, transparent); color: color-mix(in srgb, var(--gold) 60%, var(--text)); }
 .arbitrage-card.found { border-color: var(--gold); }
-.flagged { margin: 0 0 8px !important; }
-.flagged b { font-size: 16px; letter-spacing: 0.08em; }
+.flagged-intro { margin: 0 0 6px !important; font-weight: 700; }
+.flagged { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+.flag { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.flag .neg, .matrix .neg-w { color: var(--worse); }
+.matrix td .neg-w { display: block; font-size: 10px; line-height: 1; margin-top: 2px; font-weight: 700; }
+.matrix td.arbitrage { line-height: 1.1; }
 .arbitrage-card .muted.small { margin-top: 8px; }
 .cycle-list { display: flex; flex-direction: column; gap: 6px; }
 .cycle { text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; }
