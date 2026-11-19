@@ -1,0 +1,60 @@
+{
+  "name": "Bay Area commute (7 cities)",
+  "description": "Driving times between neighboring cities. ESTIMATED placeholder numbers; replace with real Google Maps times.",
+  "directed": true,
+  "units": "min",
+  "weightProfiles": [
+    { "id": "am_peak", "label": "Morning peak" },
+    { "id": "pm_peak", "label": "Evening peak" },
+    { "id": "off_peak", "label": "Off-peak" }
+  ],
+  "nodes": [
+    { "id": "SF",  "label": "San Francisco", "lat": 37.7749, "lng": -122.4194, "x": 0.4, "y": 1.6 },
+    { "id": "OAK", "label": "Oakland",       "lat": 37.8044, "lng": -122.2712, "x": 2.0, "y": 1.4 },
+    { "id": "BRK", "label": "Berkeley",      "lat": 37.8715, "lng": -122.2730, "x": 3.2, "y": 0.6 },
+    { "id": "SM",  "label": "San Mateo",     "lat": 37.5630, "lng": -122.3255, "x": 0.8, "y": 3.2 },
+    { "id": "PA",  "label": "Palo Alto",     "lat": 37.4419, "lng": -122.1430, "x": 1.8, "y": 4.4 },
+    { "id": "FRE", "label": "Fremont",       "lat": 37.5485, "lng": -121.9886, "x": 3.4, "y": 3.0 },
+    { "id": "SJ",  "label": "San Jose",      "lat": 37.3382, "lng": -121.8863, "x": 3.6, "y": 4.8 }
+  ],
+  "edges": [
+    { "from": "SF",  "to": "OAK", "weight": { "am_peak": 20, "pm_peak": 45, "off_peak": 18 } },
+    { "from": "OAK", "to": "SF",  "weight": { "am_peak": 45, "pm_peak": 22, "off_peak": 18 } },
+    { "from": "OAK", "to": "BRK", "weight": { "am_peak": 12, "pm_peak": 18, "off_peak": 10 } },
+    { "from": "BRK", "to": "OAK", "weight": { "am_peak": 18, "pm_peak": 12, "off_peak": 10 } },
+    { "from": "SF",  "to": "SM",  "weight": { "am_peak": 25, "pm_peak": 40, "off_peak": 22 } },
+    { "from": "SM",  "to": "SF",  "weight": { "am_peak": 38, "pm_peak": 25, "off_peak": 22 } },
+    { "from": "SM",  "to": "PA",  "weight": { "am_peak": 25, "pm_peak": 20, "off_peak": 18 } },
+    { "from": "PA",  "to": "SM",  "weight": { "am_peak": 20, "pm_peak": 28, "off_peak": 18 } },
+    { "from": "PA",  "to": "SJ",  "weight": { "am_peak": 22, "pm_peak": 40, "off_peak": 20 } },
+    { "from": "SJ",  "to": "PA",  "weight": { "am_peak": 40, "pm_peak": 24, "off_peak": 20 } },
+    { "from": "SJ",  "to": "FRE", "weight": { "am_peak": 22, "pm_peak": 45, "off_peak": 20 } },
+    { "from": "FRE", "to": "SJ",  "weight": { "am_peak": 42, "pm_peak": 22, "off_peak": 20 } },
+    { "from": "FRE", "to": "OAK", "weight": { "am_peak": 48, "pm_peak": 30, "off_peak": 28 } },
+    { "from": "OAK", "to": "FRE", "weight": { "am_peak": 30, "pm_peak": 50, "off_peak": 28 } },
+    { "from": "SM",  "to": "FRE", "weight": { "am_peak": 28, "pm_peak": 50, "off_peak": 25 } },
+    { "from": "FRE", "to": "SM",  "weight": { "am_peak": 50, "pm_peak": 30, "off_peak": 25 } },
+    { "from": "PA",  "to": "FRE", "weight": { "am_peak": 25, "pm_peak": 45, "off_peak": 20 } },
+    { "from": "FRE", "to": "PA",  "weight": { "am_peak": 45, "pm_peak": 25, "off_peak": 20 } }
+  ],
+  "scenarios": [
+    {
+      "name": "Bay Bridge closed",
+      "description": "No direct SF ↔ Oakland driving.",
+      "removeEdges": [["SF", "OAK"], ["OAK", "SF"]]
+    },
+    {
+      "name": "Dumbarton Bridge closed",
+      "description": "No Palo Alto ↔ Fremont crossing.",
+      "removeEdges": [["PA", "FRE"], ["FRE", "PA"]]
+    },
+    {
+      "name": "Express lane SF → San Jose",
+      "description": "A hypothetical 45-minute express route in both directions.",
+      "addEdges": [
+        { "from": "SF", "to": "SJ", "weight": { "am_peak": 45, "pm_peak": 45, "off_peak": 45 } },
+        { "from": "SJ", "to": "SF", "weight": { "am_peak": 45, "pm_peak": 45, "off_peak": 45 } }
+      ]
+    }
+  ]
+}

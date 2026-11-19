@@ -1,0 +1,20 @@
+{
+  "name": "My graph",
+  "description": "Copy this file, rename it (without the leading underscore), and edit it.",
+  "directed": true,
+  "units": "",
+  "nodes": [
+    { "id": "A", "x": 0, "y": 0 },
+    { "id": "B", "x": 2, "y": 0 },
+    { "id": "C", "x": 1, "y": 1.5 }
+  ],
+  "edges": [
+    { "from": "A", "to": "B", "weight": 4 },
+    { "from": "B", "to": "C", "weight": 1 },
+    { "from": "A", "to": "C", "weight": 6 },
+    { "from": "C", "to": "A", "weight": 2 }
+  ],
+  "scenarios": [
+    { "name": "Remove A → C", "removeEdges": [["A", "C"]] }
+  ]
+}

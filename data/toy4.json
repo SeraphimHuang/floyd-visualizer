@@ -1,0 +1,32 @@
+{
+  "name": "4-node example",
+  "description": "Small directed graph for walking through Floyd-Warshall step by step.",
+  "directed": true,
+  "nodes": [
+    { "id": "A", "x": 0, "y": 0 },
+    { "id": "B", "x": 1, "y": 0 },
+    { "id": "C", "x": 1, "y": 1 },
+    { "id": "D", "x": 0, "y": 1 }
+  ],
+  "edges": [
+    { "from": "A", "to": "B", "weight": 3 },
+    { "from": "A", "to": "D", "weight": 7 },
+    { "from": "B", "to": "A", "weight": 8 },
+    { "from": "B", "to": "C", "weight": 2 },
+    { "from": "C", "to": "A", "weight": 5 },
+    { "from": "C", "to": "D", "weight": 1 },
+    { "from": "D", "to": "A", "weight": 2 }
+  ],
+  "scenarios": [
+    {
+      "name": "Add shortcut A → C",
+      "description": "A new edge A → C with weight 1.",
+      "addEdges": [{ "from": "A", "to": "C", "weight": 1 }]
+    },
+    {
+      "name": "Remove C → D",
+      "description": "What if the edge C → D disappears?",
+      "removeEdges": [["C", "D"]]
+    }
+  ]
+}
