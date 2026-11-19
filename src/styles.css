@@ -339,6 +339,12 @@ input[type='range'] { accent-color: var(--primary-strong); }
 .matrix.compact td { min-width: 40px; height: 34px; padding: 0 3px; font-size: 13px; }
 .matrix.compact th { padding: 2px 3px; font-size: 13px; }
 .matrix td.diag { color: var(--muted); }
+.matrix td.unbounded {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--gold) 22%, var(--cell)) 0 5px, var(--cell) 5px 10px);
+  color: var(--muted);
+}
+.sw-unbounded { border: none; background: repeating-linear-gradient(135deg, var(--gold) 0 3px, transparent 3px 6px); }
+.unbounded-note { margin: 6px 0 !important; }
 .matrix td.arbitrage {
   background: color-mix(in srgb, var(--gold) 45%, var(--cell)); font-weight: 800;
   box-shadow: inset 0 0 0 2px var(--gold);

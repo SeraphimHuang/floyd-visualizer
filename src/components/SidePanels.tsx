@@ -14,6 +14,9 @@ export function PathPanel(props: {
   isFinal: boolean;
   /** An arbitrage loop exists right now, so "best" values near it are not meaningful. */
   hasArbitrage: boolean;
+  /** Set when the selected route can enter an arbitrage loop (undefined = it can't). */
+  loop?: NegativeCycle | null;
+  loopNode?: number;
   onClear: () => void;
 }) {
   const { graph, src, tgt, path } = props;
@@ -30,6 +33,21 @@ export function PathPanel(props: {
         <p className="muted">Click two nodes (or a matrix cell) to see the best {exchange ? 'route' : 'path'} between them.</p>
       ) : tgt === null ? (
         <p className="muted">From <b>{id(src)}</b>. Now click the destination.</p>
+      ) : props.loop !== undefined ? (
+        <>
+          <div className="path-line">{id(src)} ⇝ {id(tgt)}: no best rate</div>
+          <p className="unbounded-note">
+            You can trade from {id(src)} into the arbitrage loop at {id(props.loopNode!)}
+            {props.loop && (
+              <> ({props.loop.nodes.map(id).join(' → ')}, +{((weightToRate(props.loop.weight) - 1) * 100).toFixed(1)}% per lap)</>
+            )}
+            , go around it as many times as you like, then trade on to {id(tgt)}. More laps, more {id(tgt)}: there is no maximum.
+          </p>
+          <p className="muted small">
+            So the number in the matrix ({formatRate(weightToRate(props.dist ?? Infinity))}) only shows how many laps
+            the algorithm happened to stack up, and no single path is "the best".
+          </p>
+        </>
       ) : (
         <>
           <div className="path-line">
@@ -40,15 +58,8 @@ export function PathPanel(props: {
           ) : (
             <PathDistance dist={props.dist} baseline={props.baselineDist} units={u} />
           )}
-          {props.hasArbitrage ? (
-            <p className="muted small">
-              An arbitrage loop exists, so routes that can pass through it have no true "best" (it keeps growing).
-              This is the value the algorithm recorded.
-            </p>
-          ) : (
-            !props.isFinal && (
-              <p className="muted small">Best found so far. It may still improve in later rounds.</p>
-            )
+          {!props.isFinal && (
+            <p className="muted small">Best found so far. It may still improve in later rounds.</p>
           )}
         </>
       )}
@@ -87,7 +98,7 @@ function ExchangeRate(props: { graph: Graph; src: number; tgt: number; dist: num
     const worse = dist > baseline;
     change = (
       <span className={worse ? 'worse' : 'better'}>
-        {' '}(was {baseline === Infinity ? 'not possible' : formatRate(weightToRate(baseline))})
+        {' '}(was {baseline === Infinity ? 'not possible' : baseline === -Infinity ? 'unlimited, via the arbitrage loop' : formatRate(weightToRate(baseline))})
       </span>
     );
   }

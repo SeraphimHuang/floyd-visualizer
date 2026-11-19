@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadRepoDatasets, parseLocalFile, type Dataset } from './core/datasets';
 import {
-  findNegativeCycles, isRoundEnd, reconstructPath, runFloyd, stateAt, stopsFor, type Granularity,
+  findNegativeCycles, isRoundEnd, reconstructPath, runFloyd, stateAt, stopsFor, unboundedVia, type Granularity,
 } from './core/floyd';
 import {
   buildGraph, exportGraph, getProfiles, scenarioOps, valueFormatter, weightToRate, type Display,
@@ -285,8 +285,15 @@ export default function App() {
   };
 
   // ---------- Highlights ----------
+  // A query whose route can pass through an arbitrage loop has no best value (and no meaningful path).
+  const queryLoopNode =
+    state && graph?.mode === 'exchange' && query.src !== null && query.tgt !== null
+      ? unboundedVia(state.dist, query.src, query.tgt)
+      : -1;
   const queryPath =
-    state && query.src !== null && query.tgt !== null ? reconstructPath(state.next, query.src, query.tgt) : null;
+    state && query.src !== null && query.tgt !== null && queryLoopNode < 0
+      ? reconstructPath(state.next, query.src, query.tgt)
+      : null;
   const baselinePath =
     comparing && originalFinal && query.src !== null && query.tgt !== null
       ? reconstructPath(originalFinal.next, query.src, query.tgt)
@@ -298,10 +305,14 @@ export default function App() {
     const w = new Map(graph.edges.map((e) => [edgeKey(e.from, e.to), e.weight]));
     return findNegativeCycles(state, (u, v) => w.get(edgeKey(u, v)));
   }, [graph, state]);
+  // The loop a query got stuck in, if any; otherwise the one picked in the Arbitrage panel.
+  const queryLoopIndex = queryLoopNode >= 0 ? cycles.findIndex((c) => c.nodes.includes(queryLoopNode)) : -1;
   const shownCycle =
-    cycles.length && queryPath === null && (isFinal || atRoundSummary || cyclePinned)
-      ? cycles[Math.min(cycleIndex, cycles.length - 1)].nodes
-      : null;
+    queryLoopIndex >= 0
+      ? cycles[queryLoopIndex].nodes
+      : cycles.length && queryPath === null && query.tgt === null && (isFinal || atRoundSummary || cyclePinned)
+        ? cycles[Math.min(cycleIndex, cycles.length - 1)].nodes
+        : null;
   const fmt = valueFormatter(graph?.mode ?? 'distance', display);
 
   const hl: Highlight = { ...NO_HIGHLIGHT, querySrc: query.src, queryTgt: query.tgt, query: queryPath, cycle: shownCycle };
@@ -522,6 +533,7 @@ export default function App() {
               query={query.src !== null && query.tgt !== null ? [query.src, query.tgt] : null}
               fmt={fmt}
               showNegativeWeight={graph.mode === 'exchange' && display === 'rate'}
+              isUnbounded={cycles.length ? (i, j) => unboundedVia(state.dist, i, j) >= 0 : undefined}
               title={graph.mode !== 'exchange' ? 'dist matrix' : display === 'rate' ? 'best rate matrix' : 'dist matrix (−ln rate)'}
               onCellClick={(i, j) => setQuery(i === j ? { src: null, tgt: null } : { src: i, tgt: j })}
             />
@@ -533,11 +545,15 @@ export default function App() {
               dist={query.src !== null && query.tgt !== null ? state.dist[query.src][query.tgt] : null}
               baselineDist={
                 comparing && originalFinal && query.src !== null && query.tgt !== null
-                  ? originalFinal.dist[query.src][query.tgt]
+                  ? graph.mode === 'exchange' && unboundedVia(originalFinal.dist, query.src, query.tgt) >= 0
+                    ? -Infinity // the original route could loop through arbitrage: no real value
+                    : originalFinal.dist[query.src][query.tgt]
                   : null
               }
               isFinal={isFinal}
               hasArbitrage={cycles.length > 0}
+              loop={queryLoopNode >= 0 ? (queryLoopIndex >= 0 ? cycles[queryLoopIndex] : null) : undefined}
+              loopNode={queryLoopNode}
               onClear={() => setQuery({ src: null, tgt: null })}
             />
             {graph.mode === 'exchange' && (

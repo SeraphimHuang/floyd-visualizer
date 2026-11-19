@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findNegativeCycles, runFloyd, stateAt, stopsFor } from './floyd';
+import { findNegativeCycles, runFloyd, stateAt, stopsFor, unboundedVia } from './floyd';
 import { buildGraph, scenarioOps, weightToRate } from './graph';
 import type { Graph, GraphFile } from './types';
 import { validateGraphFile } from './validate';
@@ -63,6 +63,19 @@ describe('exchange mode', () => {
     const stops = new Set(stopsFor(trace, 'pairs'));
     const firstDiag = trace.steps.findIndex((s) => s.i === s.j && s.updated) + 1;
     expect(stops.has(firstDiag)).toBe(true);
+  });
+
+  it('marks pairs that can loop through the arbitrage as unbounded', () => {
+    const { trace } = arbitrage(graph);
+    const { dist } = stateAt(trace, trace.steps.length);
+    const at = (id: string) => graph.nodes.findIndex((n) => n.id === id);
+    // 🐼 can reach 🐱 (on the loop), so 🐼 → 🐱 has no best rate.
+    expect(unboundedVia(dist, at('🐼'), at('🐱'))).toBeGreaterThanOrEqual(0);
+    // With the Duck price fixed there is no loop, so nothing is unbounded.
+    const fix = coins.scenarios!.find((s) => s.name === 'Fix the Duck price')!;
+    const fixed = runFloyd(buildGraph(coins, null, scenarioOps(fix)));
+    const d2 = stateAt(fixed, fixed.steps.length).dist;
+    expect(unboundedVia(d2, at('🐼'), at('🐱'))).toBe(-1);
   });
 
   it('validates rates', () => {

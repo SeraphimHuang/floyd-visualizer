@@ -150,6 +150,18 @@ export const isRoundEnd = (trace: Trace, p: number) =>
 
 // ---------- Negative cycles (arbitrage) ----------
 
+/**
+ * If the best i → j value is unbounded (i can reach a node k on a negative cycle, and k can
+ * reach j, so you can go around the cycle as often as you like), returns such a k; else -1.
+ * For these pairs the numbers and `next` pointers Floyd-Warshall leaves behind are meaningless.
+ */
+export function unboundedVia(dist: number[][], i: number, j: number): number {
+  for (let k = 0; k < dist.length; k++) {
+    if (dist[k][k] < -NEGATIVE_EPS && dist[i][k] < Infinity && dist[k][j] < Infinity) return k;
+  }
+  return -1;
+}
+
 /** Below this, a diagonal entry counts as negative (guards against floating-point noise). */
 export const NEGATIVE_EPS = 1e-9;
 

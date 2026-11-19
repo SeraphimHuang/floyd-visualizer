@@ -20,10 +20,12 @@ interface Props {
   title: string;
   /** Rate view: also print the (negative) −ln weight under arbitrage diagonal cells. */
   showNegativeWeight?: boolean;
+  /** Pairs whose best value is unbounded because the route can go around an arbitrage loop. */
+  isUnbounded?: (i: number, j: number) => boolean;
   onCellClick: (i: number, j: number) => void;
 }
 
-export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, fmt, title, showNegativeWeight, onCellClick }: Props) {
+export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, fmt, title, showNegativeWeight, isUnbounded, onCellClick }: Props) {
   const formatWeight = fmt;
   const ids = graph.nodes.map((n) => n.id);
   const changedCount = diffAgainst
@@ -58,6 +60,7 @@ export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, fmt, 
                   const cls = ['cell'];
                   if (k !== null && (i === k || j === k)) cls.push('in-k');
                   if (i === j) cls.push(v < -NEGATIVE_EPS ? 'arbitrage' : 'diag');
+                  else if (isUnbounded?.(i, j)) cls.push('unbounded');
                   let content: React.ReactNode = formatWeight(v);
 
                   if (step && !step.trivial) {
@@ -110,6 +113,11 @@ export function MatrixPanel({ graph, dist, step, p, k, diffAgainst, query, fmt, 
           </tbody>
         </table>
       </div>
+      {isUnbounded && (
+        <div className="matrix-legend">
+          <span className="sw sw-unbounded" /> route can loop through arbitrage: no real best value
+        </div>
+      )}
       {step && !step.trivial && (
         <div className="matrix-legend">
           <span className="sw sw-ik" /> dist[i][k]
